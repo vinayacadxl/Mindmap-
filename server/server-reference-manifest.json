@@ -1,0 +1,17 @@
+{
+  "node": {
+    "40dab454e6a1551b88a84a7afd2bd1f4d81db2919b": {
+      "workers": {
+        "app/page": {
+          "moduleId": "[project]/.next-internal/server/app/page/actions.js { ACTIONS_MODULE0 => \"[project]/src/ai/flows/suggest-tasks.ts [app-rsc] (ecmascript)\" } [app-rsc] (server actions loader, ecmascript)",
+          "async": false
+        }
+      },
+      "layer": {
+        "app/page": "action-browser"
+      }
+    }
+  },
+  "edge": {},
+  "encryptionKey": "zC+1u0oE11xdrTQtw2d/n/AULP46tsv4W9WKUdTlwAk="
+}

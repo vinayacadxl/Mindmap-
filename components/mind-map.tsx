@@ -1,0 +1,430 @@
+"use client";
+
+import React, { useState, useCallback, useEffect, useRef } from 'react';
+import ReactFlow, {
+  ReactFlowProvider,
+  useNodesState,
+  useEdgesState,
+  addEdge,
+  MiniMap,
+  Controls,
+  Background,
+  type Connection,
+  type Edge,
+  type Node,
+  BackgroundVariant,
+  type EdgeMarkerType,
+  type NodeChange,
+  type EdgeChange,
+  applyNodeChanges,
+  applyEdgeChanges,
+  useReactFlow,
+} from 'reactflow';
+import 'reactflow/dist/style.css';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
+
+import { db, isFirebaseConfigured } from '@/lib/firebase/client';
+import { useAuth } from '@/hooks/use-auth';
+import TaskNode, { type TaskData } from '@/components/task-node';
+import TitleNode, { type TitleData } from '@/components/title-node';
+import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Textarea } from '@/components/ui/textarea';
+import { useToast } from '@/hooks/use-toast';
+import { suggestTasks } from '@/ai/flows/suggest-tasks';
+import { Plus, Sparkles, Loader2, Type, BrainCircuit } from 'lucide-react';
+import { UserMenu } from './user-menu';
+
+const nodeTypes = {
+  task: TaskNode as React.FC<any>,
+  title: TitleNode as React.FC<any>,
+};
+
+const initialNodes: Node<TaskData>[] = [
+  {
+    id: 'task-1',
+    type: 'task',
+    position: { x: 100, y: 100 },
+    data: { 
+      title: 'Project Kick-off', 
+      description: 'Double-click me to edit my content!', 
+      status: 'done',
+      assignedTo: 'Alice',
+      createdAt: new Date(new Date().setDate(new Date().getDate() - 10)).toISOString(),
+      dueDate: new Date(new Date().setDate(new Date().getDate() - 5)).toISOString()
+    },
+  },
+  {
+    id: 'task-2',
+    type: 'task',
+    position: { x: 400, y: 50 },
+    data: { 
+      title: 'Design Phase', 
+      description: 'Create wireframes and mockups.', 
+      status: 'inprogress',
+      assignedTo: 'Bob',
+      createdAt: new Date(new Date().setDate(new Date().getDate() - 5)).toISOString(),
+      dueDate: new Date(new Date().setDate(new Date().getDate() + 5)).toISOString()
+    },
+  },
+  {
+    id: 'task-3',
+    type: 'task',
+    position: { x: 400, y: 250 },
+    data: { 
+      title: 'Development', 
+      description: 'Use the "Add Task" button to create new tasks.', 
+      status: 'todo',
+      createdAt: new Date().toISOString(),
+    },
+  },
+];
+
+const initialEdges: Edge[] = [
+    { id: 'e1-2', source: 'task-1', target: 'task-2' },
+];
+
+const defaultEdgeOptions = {
+    animated: true,
+    type: 'smoothstep',
+    style: { strokeWidth: 2 },
+    markerEnd: { type: 'arrowclosed' as EdgeMarkerType },
+  };
+
+function MindMapComponent() {
+  const [nodes, setNodes] = useState<Node<any>[]>([]);
+  const [edges, setEdges] = useState<Edge[]>(initialEdges);
+  const [isAiAddTaskDialogOpen, setAiAddTaskDialogOpen] = useState(false);
+  const [aiAddTaskPrompt, setAiAddTaskPrompt] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [isDataLoaded, setIsDataLoaded] = useState(false);
+  const { toast } = useToast();
+  const { user } = useAuth();
+  const { deleteElements } = useReactFlow();
+  
+  const nodesRef = useRef(nodes);
+  const edgesRef = useRef(edges);
+
+  useEffect(() => {
+    nodesRef.current = nodes;
+    edgesRef.current = edges;
+  }, [nodes, edges]);
+
+  const saveData = useCallback(async (nodesToSave: Node[], edgesToSave: Edge[]) => {
+    if (!user || !isFirebaseConfigured || !db) return;
+    try {
+      const plainNodes = nodesToSave.map(({ data, ...node }) => {
+        const { onUpdateNode, onDeleteNode, ...restData } = data;
+        
+        // Firestore doesn't support `undefined` values. We convert them to `null` before saving.
+        const sanitizedData: { [key: string]: any } = {};
+        for (const key in restData) {
+          if (Object.prototype.hasOwnProperty.call(restData, key)) {
+            const value = (restData as any)[key];
+            sanitizedData[key] = value === undefined ? null : value;
+          }
+        }
+        
+        return { ...node, data: sanitizedData };
+      });
+      const userDocRef = doc(db, 'mindmaps', user.uid);
+      await setDoc(userDocRef, { nodes: plainNodes, edges: edgesToSave });
+    } catch (error) {
+      console.error('Error saving data:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'Failed to save your mind map.',
+      });
+    }
+  }, [user, toast]);
+
+  const onUpdateNode = useCallback((id: string, data: Record<string, any>) => {
+    const newNodes = nodesRef.current.map((node) => {
+      if (node.id === id) {
+        return { ...node, data: { ...node.data, ...data } };
+      }
+      return node;
+    });
+    setNodes(newNodes);
+    saveData(newNodes, edgesRef.current);
+  }, [saveData]);
+
+  const onDeleteNode = useCallback((nodeId: string) => {
+    deleteElements({ nodes: [{ id: nodeId }] });
+    const nodeToRemove = nodesRef.current.find(n => n.id === nodeId);
+    if (nodeToRemove) {
+      toast({
+        title: 'Node Removed',
+        description: `"${nodeToRemove.data.title || nodeToRemove.data.label}" was deleted.`,
+      });
+    }
+  }, [deleteElements, toast]);
+
+
+  useEffect(() => {
+    const loadInitialData = () => {
+      const nodesWithCallback: Node<any>[] = initialNodes.map((node) => ({
+        ...node,
+        data: { ...node.data, onUpdateNode, onDeleteNode },
+      }));
+      setNodes(nodesWithCallback);
+      setEdges(initialEdges);
+      setIsDataLoaded(true);
+    };
+
+    if (!user || !isFirebaseConfigured || !db) {
+      loadInitialData();
+      return;
+    }
+
+    const loadData = async () => {
+      setIsDataLoaded(false);
+      const userDocRef = doc(db, 'mindmaps', user.uid);
+      const docSnap = await getDoc(userDocRef);
+
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        const loadedNodes: Node<any>[] = (data.nodes || []).map((node: Node) => ({
+          ...node,
+          data: {
+            ...node.data,
+            onUpdateNode,
+            onDeleteNode,
+          },
+        }));
+        setNodes(loadedNodes);
+        setEdges(data.edges || []);
+      } else {
+        const nodesWithCallback: Node<any>[] = initialNodes.map((node) => ({
+          ...node,
+          data: { ...node.data, onUpdateNode, onDeleteNode },
+        }));
+        setNodes(nodesWithCallback);
+        setEdges(initialEdges);
+        saveData(nodesWithCallback, initialEdges);
+      }
+      setIsDataLoaded(true);
+    };
+
+    loadData();
+  }, [user, onUpdateNode, onDeleteNode, saveData]);
+
+
+  const onNodesChange = useCallback((changes: NodeChange[]) => {
+      const newNodes = applyNodeChanges(changes, nodesRef.current);
+      setNodes(newNodes);
+      if (changes.some(c => c.type === 'remove' || c.type === 'position' && c.dragging === false)) {
+          saveData(newNodes, edgesRef.current);
+      }
+  }, [saveData]);
+
+  const onEdgesChange = useCallback((changes: EdgeChange[]) => {
+      const newEdges = applyEdgeChanges(changes, edgesRef.current);
+      setEdges(newEdges);
+      if (changes.some(c => c.type === 'remove')) {
+          saveData(nodesRef.current, newEdges);
+      }
+  }, [saveData]);
+  
+  const onConnect = useCallback((params: Connection) => {
+    const newEdges = addEdge(params, edgesRef.current);
+    setEdges(newEdges);
+    saveData(nodesRef.current, newEdges);
+  }, [saveData]);
+
+  const handleAddTask = useCallback(() => {
+    const id = `task-${crypto.randomUUID()}`;
+    const newNode: Node<TaskData> = {
+      id,
+      type: 'task',
+      position: {
+        x: Math.random() * 500,
+        y: Math.random() * 500,
+      },
+      data: {
+        title: 'New Task',
+        description: '',
+        status: 'todo',
+        createdAt: new Date().toISOString(),
+        onUpdateNode,
+        onDeleteNode,
+      },
+    };
+    const newNodes = nodesRef.current.concat(newNode);
+    setNodes(newNodes);
+    saveData(newNodes, edgesRef.current);
+  }, [onUpdateNode, onDeleteNode, saveData]);
+
+  const handleAddTitle = useCallback(() => {
+    const id = `title-${crypto.randomUUID()}`;
+    const newNode: Node<TitleData> = {
+      id,
+      type: 'title',
+      position: {
+        x: Math.random() * 200,
+        y: Math.random() * 200,
+      },
+      data: {
+        label: 'Floating Title',
+        fontSize: 28,
+        onUpdateNode,
+        onDeleteNode,
+      },
+    };
+    const newNodes = nodesRef.current.concat(newNode);
+    setNodes(newNodes);
+    saveData(newNodes, edgesRef.current);
+  }, [onUpdateNode, onDeleteNode, saveData]);
+
+  const handleOpenAiAddTaskDialog = useCallback(() => {
+    setAiAddTaskPrompt('');
+    setAiAddTaskDialogOpen(true);
+  }, []);
+
+  const handleSuggestTasks = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const result = await suggestTasks({ prompt: aiAddTaskPrompt });
+      
+      const newNodes: Node<TaskData>[] = result.tasks.map(task => {
+        const id = `task-${crypto.randomUUID()}`;
+        return {
+          id,
+          type: 'task',
+          position: {
+            x: Math.random() * 500,
+            y: Math.random() * 500,
+          },
+          data: {
+            title: task.title,
+            description: task.description,
+            status: 'todo',
+            createdAt: new Date().toISOString(),
+            onUpdateNode,
+            onDeleteNode,
+          },
+        };
+      });
+
+      if(newNodes.length > 0) {
+        const updatedNodes = nodesRef.current.concat(newNodes);
+        setNodes(updatedNodes);
+        saveData(updatedNodes, edgesRef.current);
+        toast({
+            title: 'AI Tasks Added',
+            description: `${newNodes.length} new tasks have been added to your mind map.`,
+        });
+      } else {
+        toast({
+            title: "AI Suggestion",
+            description: "The AI didn't suggest any new tasks based on your prompt.",
+        });
+      }
+      
+      setAiAddTaskDialogOpen(false);
+    } catch (error) {
+      console.error('AI task suggestion failed:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'Failed to get AI task suggestions. Please try again.',
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  }, [aiAddTaskPrompt, onUpdateNode, onDeleteNode, saveData, toast]);
+
+
+  if (!isDataLoaded) {
+    return (
+      <div className="flex h-screen w-full items-center justify-center bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col h-screen bg-background text-foreground">
+      <header className="flex items-center justify-between p-4 border-b shrink-0">
+        <h1 className="text-xl font-bold md:text-2xl font-headline text-foreground">MindTask Navigator</h1>
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            <Button onClick={handleAddTitle} size="sm" variant="outline">
+              <Type className="mr-2" />
+              Add Title
+            </Button>
+            <Button onClick={handleAddTask} size="sm" variant="outline">
+              <Plus className="mr-2" />
+              Add Task
+            </Button>
+            <Button onClick={handleOpenAiAddTaskDialog} size="sm">
+              <BrainCircuit className="mr-2" />
+              AI Add Tasks
+            </Button>
+          </div>
+          <UserMenu />
+        </div>
+      </header>
+      <main className="flex-1">
+        <ReactFlow
+          nodes={nodes}
+          edges={edges}
+          onNodesChange={onNodesChange}
+          onEdgesChange={onEdgesChange}
+          onConnect={onConnect}
+          nodeTypes={nodeTypes}
+          defaultEdgeOptions={defaultEdgeOptions}
+          fitView
+          className="bg-background"
+        >
+          <Controls />
+          <MiniMap nodeStrokeWidth={3} zoomable pannable />
+          <Background variant={BackgroundVariant.Dots} gap={16} />
+        </ReactFlow>
+      </main>
+      
+      <Dialog open={isAiAddTaskDialogOpen} onOpenChange={setAiAddTaskDialogOpen}>
+        <DialogContent className="sm:max-w-[625px]">
+          <DialogHeader>
+            <DialogTitle>AI-Powered Task Generation</DialogTitle>
+            <DialogDescription>
+              Describe your goal, and the AI will break it down into tasks for you.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <Textarea
+              value={aiAddTaskPrompt}
+              onChange={(e) => setAiAddTaskPrompt(e.target.value)}
+              className="min-h-[100px]"
+              placeholder="e.g., Launch a new weekly podcast"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAiAddTaskDialogOpen(false)} disabled={isLoading}>Cancel</Button>
+            <Button onClick={handleSuggestTasks} disabled={isLoading || !aiAddTaskPrompt}>
+              {isLoading ? <Loader2 className="animate-spin mr-2" /> : <BrainCircuit className="mr-2" />}
+              Generate Tasks
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+
+export default function MindMap() {
+  return (
+    <ReactFlowProvider>
+      <MindMapComponent />
+    </ReactFlowProvider>
+  );
+}
