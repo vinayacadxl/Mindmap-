@@ -18,6 +18,14 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  experimental: {
+    turbo: {
+      resolveAlias: {
+        '@opentelemetry/exporter-jaeger': './empty-module.js',
+      },
+    },
+  },
+  serverExternalPackages: ['@opentelemetry/sdk-node'],
   webpack: (config, { isServer }) => {
     if (isServer) {
       // Ignore optional OpenTelemetry exporter that is not installed
