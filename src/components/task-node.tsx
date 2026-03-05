@@ -61,7 +61,7 @@ const TaskNode = ({ id, data, selected }: NodeProps<TaskData>) => {
         setProgress(now >= end ? 100 : 0);
         return;
       }
-      
+
       if (now >= end) {
         setProgress(100);
         return;
@@ -70,7 +70,7 @@ const TaskNode = ({ id, data, selected }: NodeProps<TaskData>) => {
         setProgress(0);
         return;
       }
-      
+
       const percentage = ((now - start) / (end - start)) * 100;
       setProgress(Math.max(0, Math.min(100, percentage)));
     };
@@ -90,37 +90,37 @@ const TaskNode = ({ id, data, selected }: NodeProps<TaskData>) => {
       setCurrentCreatedAt(createdAt);
     }
   }, [title, description, assignedTo, dueDate, createdAt, isEditing]);
-  
+
   const handleDoubleClick = () => {
     setIsEditing(true);
   };
 
   const commitChanges = useCallback(() => {
     if (title !== currentTitle || description !== currentDescription || assignedTo !== currentAssignedTo || dueDate !== currentDueDate || createdAt !== currentCreatedAt) {
-        onUpdateNode(id, { 
-          title: currentTitle, 
-          description: currentDescription,
-          assignedTo: currentAssignedTo,
-          dueDate: currentDueDate,
-          createdAt: currentCreatedAt,
-        });
+      onUpdateNode(id, {
+        title: currentTitle,
+        description: currentDescription,
+        assignedTo: currentAssignedTo,
+        dueDate: currentDueDate,
+        createdAt: currentCreatedAt,
+      });
     }
     setIsEditing(false);
   }, [id, onUpdateNode, title, currentTitle, description, currentDescription, assignedTo, currentAssignedTo, dueDate, currentDueDate, createdAt, currentCreatedAt]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-      if (e.key === 'Enter' && !e.shiftKey) {
-          e.preventDefault();
-          commitChanges();
-      }
-      if (e.key === 'Escape') {
-          setCurrentTitle(title);
-          setCurrentDescription(description);
-          setCurrentAssignedTo(assignedTo);
-          setCurrentDueDate(dueDate);
-          setCurrentCreatedAt(createdAt);
-          setIsEditing(false);
-      }
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      commitChanges();
+    }
+    if (e.key === 'Escape') {
+      setCurrentTitle(title);
+      setCurrentDescription(description);
+      setCurrentAssignedTo(assignedTo);
+      setCurrentDueDate(dueDate);
+      setCurrentCreatedAt(createdAt);
+      setIsEditing(false);
+    }
   }
 
   const handleStatusChange = useCallback(
@@ -129,22 +129,22 @@ const TaskNode = ({ id, data, selected }: NodeProps<TaskData>) => {
     },
     [id, onUpdateNode]
   );
-  
+
   const handleStartDateSelect = (date: Date | undefined) => {
     setCurrentCreatedAt(date ? date.toISOString() : undefined);
   };
-  
+
   const handleDueDateSelect = (date: Date | undefined) => {
     setCurrentDueDate(date ? date.toISOString() : undefined);
   };
 
   return (
-    <Card 
+    <Card
       className={cn(
-        "group relative w-72 rounded-lg border-2 shadow-lg transition-all duration-300",
-        "bg-card/80 backdrop-blur-sm",
+        "group relative w-80 rounded-[2rem] border-2 shadow-sm transition-all duration-500",
+        "bg-card/90 backdrop-blur-xl",
         config.borderClass,
-        selected ? 'shadow-primary/40 shadow-2xl' : 'hover:shadow-2xl hover:shadow-primary/20'
+        selected ? 'shadow-primary/30 shadow-2xl scale-[1.02]' : 'hover:shadow-2xl hover:shadow-primary/10 hover:translate-y-[-4px]'
       )}
       onDoubleClick={handleDoubleClick}
     >
@@ -160,127 +160,127 @@ const TaskNode = ({ id, data, selected }: NodeProps<TaskData>) => {
       <CardHeader className="flex flex-row items-center gap-2 space-y-0 p-4">
         <config.icon className={cn("h-5 w-5 shrink-0", config.textClass)} />
         {isEditing ? (
-            <Input
-              value={currentTitle}
-              onChange={(e) => setCurrentTitle(e.target.value)}
-              onKeyDown={handleKeyDown}
-              className="h-auto border-none bg-transparent px-0 text-lg font-bold focus-visible:ring-0"
-              aria-label="Task title"
-              autoFocus
-            />
+          <Input
+            value={currentTitle}
+            onChange={(e) => setCurrentTitle(e.target.value)}
+            onKeyDown={handleKeyDown}
+            className="h-auto border-none bg-transparent px-0 text-xl font-extrabold focus-visible:ring-0"
+            aria-label="Task title"
+            autoFocus
+          />
         ) : (
-            <div className="text-lg font-bold truncate flex-1 transition-colors duration-300 group-hover:text-primary">{title}</div>
+          <div className="text-xl font-extrabold tracking-tight truncate flex-1 transition-colors duration-300 group-hover:text-primary">{title}</div>
         )}
       </CardHeader>
       <CardContent className="space-y-4 p-4 pt-0">
         {isEditing ? (
-            <div className="space-y-2">
-                <Textarea
-                    value={currentDescription}
-                    onChange={(e) => setCurrentDescription(e.target.value)}
-                    onKeyDown={handleKeyDown}
-                    placeholder="Description..."
-                    className="h-auto border-none bg-transparent px-0 text-sm text-muted-foreground focus-visible:ring-0"
-                    aria-label="Task description"
-                />
-                <Input
-                    value={currentAssignedTo || ''}
-                    onChange={(e) => setCurrentAssignedTo(e.target.value)}
-                    onKeyDown={handleKeyDown}
-                    placeholder="Assign to..."
-                    className="h-auto border-none bg-transparent px-0 text-sm focus-visible:ring-0"
-                    aria-label="Assignee"
-                />
-                 <Popover>
-                    <PopoverTrigger asChild>
-                        <Button
-                            variant={"outline"}
-                            className={cn(
-                                "w-full justify-start text-left font-normal",
-                                !currentCreatedAt && "text-muted-foreground"
-                            )}
-                        >
-                            <CalendarIcon className="mr-2 h-4 w-4" />
-                            {currentCreatedAt ? `Start: ${format(new Date(currentCreatedAt), "PPP")}` : <span>Pick a start date</span>}
-                        </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar
-                            mode="single"
-                            selected={currentCreatedAt ? new Date(currentCreatedAt) : undefined}
-                            onSelect={handleStartDateSelect}
-                            initialFocus
-                        />
-                    </PopoverContent>
-                </Popover>
-                <Popover>
-                    <PopoverTrigger asChild>
-                        <Button
-                            variant={"outline"}
-                            className={cn(
-                                "w-full justify-start text-left font-normal",
-                                !currentDueDate && "text-muted-foreground"
-                            )}
-                        >
-                            <CalendarIcon className="mr-2 h-4 w-4" />
-                            {currentDueDate ? `Due: ${format(new Date(currentDueDate), "PPP")}`: <span>Pick a due date</span>}
-                        </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar
-                            mode="single"
-                            selected={currentDueDate ? new Date(currentDueDate) : undefined}
-                            onSelect={handleDueDateSelect}
-                            initialFocus
-                        />
-                    </PopoverContent>
-                </Popover>
-                <Button onClick={commitChanges} size="sm" className="w-full mt-2">
-                  <Check className="mr-2 h-4 w-4" />
-                  Done
+          <div className="space-y-2">
+            <Textarea
+              value={currentDescription}
+              onChange={(e) => setCurrentDescription(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="Description..."
+              className="h-auto border-none bg-transparent px-0 text-sm text-muted-foreground focus-visible:ring-0"
+              aria-label="Task description"
+            />
+            <Input
+              value={currentAssignedTo || ''}
+              onChange={(e) => setCurrentAssignedTo(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="Assign to..."
+              className="h-auto border-none bg-transparent px-0 text-sm focus-visible:ring-0"
+              aria-label="Assignee"
+            />
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant={"outline"}
+                  className={cn(
+                    "w-full justify-start text-left font-normal",
+                    !currentCreatedAt && "text-muted-foreground"
+                  )}
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {currentCreatedAt ? `Start: ${format(new Date(currentCreatedAt), "PPP")}` : <span>Pick a start date</span>}
                 </Button>
-            </div>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={currentCreatedAt ? new Date(currentCreatedAt) : undefined}
+                  onSelect={handleStartDateSelect}
+                  initialFocus
+                />
+              </PopoverContent>
+            </Popover>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant={"outline"}
+                  className={cn(
+                    "w-full justify-start text-left font-normal",
+                    !currentDueDate && "text-muted-foreground"
+                  )}
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {currentDueDate ? `Due: ${format(new Date(currentDueDate), "PPP")}` : <span>Pick a due date</span>}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={currentDueDate ? new Date(currentDueDate) : undefined}
+                  onSelect={handleDueDateSelect}
+                  initialFocus
+                />
+              </PopoverContent>
+            </Popover>
+            <Button onClick={commitChanges} size="sm" className="w-full mt-2">
+              <Check className="mr-2 h-4 w-4" />
+              Done
+            </Button>
+          </div>
         ) : (
-            <>
-                <p className="text-sm text-muted-foreground min-h-[20px] max-h-6 overflow-hidden transition-all duration-300 ease-in-out group-hover:max-h-48">{description || "No description"}</p>
-                {progress !== null && createdAt && dueDate && (
-                    <div className="space-y-1 pt-2">
-                         <Progress value={progress} className="h-2 w-full" />
-                         <div className="flex justify-between text-xs text-muted-foreground">
-                            <span>{format(new Date(createdAt), "PP")}</span>
-                            <span>{format(new Date(dueDate), "PP")}</span>
-                         </div>
-                          <p className="text-right text-xs font-semibold text-muted-foreground">
-                            {status === 'done' ? 'Completed' : progress >= 100 ? 'Overdue' : `${(100 - progress).toFixed(0)}% time remaining`}
-                         </p>
-                    </div>
-                )}
-            </>
+          <>
+            <p className="text-sm text-muted-foreground min-h-[20px] max-h-6 overflow-hidden transition-all duration-300 ease-in-out group-hover:max-h-48">{description || "No description"}</p>
+            {progress !== null && createdAt && dueDate && (
+              <div className="space-y-1 pt-2">
+                <Progress value={progress} className="h-2 w-full" />
+                <div className="flex justify-between text-xs text-muted-foreground">
+                  <span>{format(new Date(createdAt), "PP")}</span>
+                  <span>{format(new Date(dueDate), "PP")}</span>
+                </div>
+                <p className="text-right text-xs font-semibold text-muted-foreground">
+                  {status === 'done' ? 'Completed' : progress >= 100 ? 'Overdue' : `${(100 - progress).toFixed(0)}% time remaining`}
+                </p>
+              </div>
+            )}
+          </>
         )}
         <div className="flex items-center justify-between pt-2">
-            {!isEditing && assignedTo ? (
-                <div className="flex items-center gap-2">
-                    <Avatar className="h-6 w-6">
-                        <AvatarFallback>{assignedTo.charAt(0).toUpperCase()}</AvatarFallback>
-                    </Avatar>
-                    <span className="text-xs font-medium text-muted-foreground">{assignedTo}</span>
-                </div>
-            ) : <div />}
-            <Select value={status} onValueChange={handleStatusChange}>
+          {!isEditing && assignedTo ? (
+            <div className="flex items-center gap-2">
+              <Avatar className="h-6 w-6">
+                <AvatarFallback>{assignedTo.charAt(0).toUpperCase()}</AvatarFallback>
+              </Avatar>
+              <span className="text-xs font-medium text-muted-foreground">{assignedTo}</span>
+            </div>
+          ) : <div />}
+          <Select value={status} onValueChange={handleStatusChange}>
             <SelectTrigger className="h-8 w-[120px] text-xs">
-                <SelectValue placeholder="Set status" />
+              <SelectValue placeholder="Set status" />
             </SelectTrigger>
             <SelectContent>
-                {Object.entries(statusConfig).map(([key, config]) => (
+              {Object.entries(statusConfig).map(([key, config]) => (
                 <SelectItem key={key} value={key as TaskStatus}>
-                    <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2">
                     <config.icon className={cn('h-4 w-4', config.textClass)} />
                     <span>{config.label}</span>
-                    </div>
+                  </div>
                 </SelectItem>
-                ))}
+              ))}
             </SelectContent>
-            </Select>
+          </Select>
         </div>
       </CardContent>
       <Handle type="source" position={Position.Right} className="!bg-primary" />
