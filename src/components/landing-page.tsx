@@ -42,7 +42,7 @@ export default function LandingPage({ onGetStarted }: { onGetStarted: () => void
                             <BrainCircuit className="h-5 w-5 text-white" />
                         </div>
                         <span className="text-lg font-black tracking-tight">
-                            MindTask<span className="text-primary">Navigator</span>
+                            Mind<span className="text-primary">Navigator</span>
                         </span>
                     </div>
 
@@ -161,7 +161,7 @@ export default function LandingPage({ onGetStarted }: { onGetStarted: () => void
                         <div className="bg-primary p-1 rounded-lg">
                             <BrainCircuit className="h-4 w-4 text-white" />
                         </div>
-                        <span className="font-bold text-white">MindTaskNavigator</span>
+                        <span className="font-bold text-white">MindNavigator</span>
                     </div>
                     <p>© 2026 MindTask Navigator. All rights reserved.</p>
                     <div className="flex gap-8">
