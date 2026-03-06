@@ -10,10 +10,10 @@ export function AuthGuard({ children }: { children: ReactNode }) {
   const router = useRouter();
 
   useEffect(() => {
-    if (!isLoading && !user) {
-      router.push('/login');
-    }
-  }, [user, isLoading, router]);
+    // If we're not loading and there's no user, we don't redirect anymore.
+    // The LandingPage handles the sign-in trigger.
+  }, [user, isLoading]);
+
 
   if (isLoading || !user) {
     return (

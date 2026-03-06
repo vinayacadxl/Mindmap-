@@ -5,18 +5,31 @@ import { Button } from '@/components/ui/button';
 import { BrainCircuit, Sparkles, Layout, Zap, ArrowRight, CheckCircle, Network, GitBranch, Brain } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
 import { useRouter } from 'next/navigation';
+import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
+import { auth } from '@/lib/firebase/client';
+
 
 export default function LandingPage({ onGetStarted }: { onGetStarted: () => void }) {
     const { user } = useAuth();
     const router = useRouter();
 
-    const handleAuthAction = () => {
+    const handleAuthAction = async () => {
         if (user) {
             onGetStarted();
         } else {
-            router.push('/login');
+            if (!auth) return;
+            const provider = new GoogleAuthProvider();
+            try {
+                await signInWithPopup(auth, provider);
+                onGetStarted();
+            } catch (error: any) {
+                if (error.code !== 'auth/cancelled-popup-request' && error.code !== 'auth/popup-closed-by-user') {
+                    console.error("Error signing in with Google: ", error);
+                }
+            }
         }
     };
+
 
     return (
         <div className="min-h-screen bg-white text-slate-900 font-sans overflow-x-hidden">

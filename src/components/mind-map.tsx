@@ -29,6 +29,7 @@ import TaskNode, { type TaskData } from '@/components/task-node';
 import TitleNode, { type TitleData } from '@/components/title-node';
 import ImageNode, { type ImageData } from '@/components/image-node';
 import { Button } from '@/components/ui/button';
+import Link from 'next/link';
 
 import {
   Dialog,
@@ -505,12 +506,12 @@ function MindMapComponent() {
   return (
     <div className="flex flex-col h-screen bg-background text-foreground overflow-hidden">
       <header className="flex items-center justify-between px-6 py-4 bg-card/90 backdrop-blur-xl border-b border-border shrink-0 z-10 shadow-sm">
-        <div className="flex items-center gap-3">
+        <Link href="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
           <div className="bg-primary p-1.5 rounded-lg shadow-lg shadow-primary/20">
             <BrainCircuit className="h-5 w-5 text-primary-foreground" />
           </div>
           <h1 className="text-xl font-extrabold tracking-tight">MindTask<span className="text-primary">Navigator</span></h1>
-        </div>
+        </Link>
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2">
             <Button onClick={handleAddTitle} size="sm" variant="outline">
