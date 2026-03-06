@@ -27,7 +27,9 @@ import { db, isFirebaseConfigured } from '@/lib/firebase/client';
 import { useAuth } from '@/hooks/use-auth';
 import TaskNode, { type TaskData } from '@/components/task-node';
 import TitleNode, { type TitleData } from '@/components/title-node';
+import ImageNode, { type ImageData } from '@/components/image-node';
 import { Button } from '@/components/ui/button';
+
 import {
   Dialog,
   DialogContent,
@@ -39,7 +41,8 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { suggestTasks } from '@/ai/flows/suggest-tasks';
-import { Plus, Sparkles, Loader2, Type, BrainCircuit } from 'lucide-react';
+import { Plus, Sparkles, Loader2, Type, BrainCircuit, Image as ImageIcon } from 'lucide-react';
+
 import { UserMenu } from './user-menu';
 import { ChatSidebar } from './chat-sidebar';
 import { MessagesSquare } from 'lucide-react';
@@ -47,7 +50,9 @@ import { MessagesSquare } from 'lucide-react';
 const nodeTypes = {
   task: TaskNode as React.FC<any>,
   title: TitleNode as React.FC<any>,
+  image: ImageNode as React.FC<any>,
 };
+
 
 const initialNodes: Node<any>[] = [
   {
@@ -59,8 +64,8 @@ const initialNodes: Node<any>[] = [
       description: 'Double-click me to edit my content!',
       status: 'done',
       assignedTo: 'Alice',
-      createdAt: new Date(new Date().setDate(new Date().getDate() - 10)).toISOString(),
-      dueDate: new Date(new Date().setDate(new Date().getDate() - 5)).toISOString()
+      createdAt: '2024-03-01T10:00:00.000Z',
+      dueDate: '2024-03-05T18:00:00.000Z'
     },
   },
   {
@@ -72,8 +77,8 @@ const initialNodes: Node<any>[] = [
       description: 'Create wireframes and mockups.',
       status: 'inprogress',
       assignedTo: 'Bob',
-      createdAt: new Date(new Date().setDate(new Date().getDate() - 5)).toISOString(),
-      dueDate: new Date(new Date().setDate(new Date().getDate() + 5)).toISOString()
+      createdAt: '2024-03-05T09:00:00.000Z',
+      dueDate: '2024-03-15T18:00:00.000Z'
     },
   },
   {
@@ -84,7 +89,7 @@ const initialNodes: Node<any>[] = [
       title: 'Development',
       description: 'Use the "Add Task" button to create new tasks.',
       status: 'todo',
-      createdAt: new Date().toISOString(),
+      createdAt: '2024-03-06T12:00:00.000Z',
     },
   },
 ];
@@ -111,6 +116,8 @@ function MindMapComponent() {
   const { toast } = useToast();
   const { user } = useAuth();
   const { deleteElements } = useReactFlow();
+
+
 
   const nodesRef = useRef(nodes);
   const edgesRef = useRef(edges);
@@ -224,7 +231,7 @@ function MindMapComponent() {
   const onNodesChange = useCallback((changes: NodeChange[]) => {
     const newNodes = applyNodeChanges(changes, nodesRef.current);
     setNodes(newNodes);
-    if (changes.some(c => c.type === 'remove' || c.type === 'position' && c.dragging === false)) {
+    if (changes.some(c => c.type === 'remove' || c.type === 'dimensions' || (c.type === 'position' && c.dragging === false))) {
       saveData(newNodes, edgesRef.current);
     }
   }, [saveData]);
@@ -286,6 +293,102 @@ function MindMapComponent() {
     setNodes(newNodes);
     saveData(newNodes, edgesRef.current);
   }, [onUpdateNode, onDeleteNode, saveData]);
+
+  const addImageNode = useCallback((imageUrl: string, label?: string) => {
+    const id = `image-${crypto.randomUUID()}`;
+    const newNode: Node<ImageData> = {
+      id,
+      type: 'image',
+      position: {
+        x: Math.random() * 400 + 100,
+        y: Math.random() * 400 + 100,
+      },
+      data: {
+        imageUrl,
+        label: label || `Pasted Image ${new Date().toLocaleTimeString()}`,
+        onUpdateNode,
+        onDeleteNode,
+      },
+    };
+
+    // Update local state first for instant feedback
+    setNodes((prev) => prev.concat(newNode));
+
+    // Save to firebase
+    const updatedNodes = nodesRef.current.concat(newNode);
+    saveData(updatedNodes, edgesRef.current);
+
+    toast({
+      title: 'Image Added',
+      description: 'The screenshot has been added to your mind map.',
+    });
+  }, [onUpdateNode, onDeleteNode, saveData, toast]);
+
+  const handlePaste = useCallback((event: ClipboardEvent) => {
+    // Only paste if we're not in an input
+    const target = event.target as HTMLElement;
+    if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return;
+
+    const items = event.clipboardData?.items;
+    if (!items) return;
+
+    let imageFound = false;
+    for (const item of Array.from(items)) {
+      if (item.type.indexOf('image') !== -1) {
+        imageFound = true;
+        const file = item.getAsFile();
+        if (!file) continue;
+
+        toast({
+          title: 'Processing Image...',
+          description: 'Please wait while we add your screenshot.',
+        });
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const result = e.target?.result as string;
+          if (result) {
+            // Check if image is too large (> 800KB) and compress if needed
+            if (result.length > 800000) {
+              const img = new Image();
+              img.onload = () => {
+                const canvas = document.createElement('canvas');
+                let width = img.width;
+                let height = img.height;
+
+                // Max width 1200px
+                if (width > 1200) {
+                  height = (1200 / width) * height;
+                  width = 1200;
+                }
+
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                ctx?.drawImage(img, 0, 0, width, height);
+                // Compress to 70% quality
+                const compressedUrl = canvas.toDataURL('image/jpeg', 0.7);
+                addImageNode(compressedUrl, 'Compressed Screenshot');
+              };
+              img.src = result;
+            } else {
+              addImageNode(result, 'Screenshot');
+            }
+          }
+        };
+        reader.readAsDataURL(file);
+      }
+    }
+  }, [addImageNode, toast]);
+
+  // Use a more robust listener approach
+  useEffect(() => {
+    const onGlobalPaste = (e: Event) => handlePaste(e as ClipboardEvent);
+    document.addEventListener('paste', onGlobalPaste);
+    return () => document.removeEventListener('paste', onGlobalPaste);
+  }, [handlePaste]);
+
+
 
   const handleWorkflowGenerated = useCallback((workflow: { tasks?: any[], edges?: any[] }) => {
     if (!workflow) return;
@@ -418,6 +521,8 @@ function MindMapComponent() {
               <Plus className="mr-2" />
               Add Task
             </Button>
+
+
             <Button onClick={handleOpenAiAddTaskDialog} size="sm">
               <Sparkles className="mr-2" />
               AI Tasks
